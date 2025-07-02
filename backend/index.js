@@ -16,7 +16,10 @@ const app = express();
 const allowedOrigins = [
   'https://shikhoron.vercel.app',
   'http://localhost:5173',
-  'http://127.0.0.1:5173'
+  'http://127.0.0.1:5173',
+  'https://shikhoron-server.vercel.app',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000'
 ];
 app.use(cors({
   origin: function (origin, callback) {
@@ -24,6 +27,8 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     } else {
+      // Log the rejected origin for debugging
+      console.error('CORS rejected origin:', origin);
       return callback(new Error('Not allowed by CORS'));
     }
   },
@@ -37,6 +42,7 @@ app.use(cors({
 app.use(express.json());
 
 // Session setup (must come before any routes that use req.session)
+const isProduction = process.env.NODE_ENV === 'production';
 app.use(session({
   secret: process.env.SESSION_SECRET || 'qna_secret',
   resave: false,
@@ -44,8 +50,8 @@ app.use(session({
   store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
   cookie: {
     maxAge: 1000 * 60 * 60 * 24, // 1 day
-    sameSite: 'none',
-    secure: true
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction
   },
   name: 'connect.sid',
 }));
