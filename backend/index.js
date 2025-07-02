@@ -15,10 +15,9 @@ const app = express();
 // CORS middleware
 app.use(cors({
   origin: [
-    'http://localhost:3000',
+    'https://shikhoron.vercel.app',
     'http://127.0.0.1:3000',
     'http://localhost:5173',
-    'https://shikhoron.vercel.app',
     'http://127.0.0.1:5173'
   ],
   credentials: true,
