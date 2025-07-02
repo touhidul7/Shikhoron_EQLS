@@ -42,8 +42,20 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
-  cookie: { maxAge: 1000 * 60 * 60 * 24 } // 1 day
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24, // 1 day
+    sameSite: 'none',
+    secure: true
+  },
+  name: 'connect.sid',
 }));
+
+// Debug session and cookie on every request
+app.use((req, res, next) => {
+  console.log('Session:', req.session);
+  console.log('Cookies:', req.headers.cookie);
+  next();
+});
 
 // Auth routes (file upload endpoints in this router will still work)
 app.use('/api/auth', require('./routes/auth'));
