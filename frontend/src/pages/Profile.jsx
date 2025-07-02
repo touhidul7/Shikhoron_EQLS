@@ -102,7 +102,7 @@ function Profile() {
         <h2 className="text-2xl font-bold mb-6 text-center text-blue-700">Profile</h2>
         <div className="flex flex-col items-center mb-4">
           <img
-            src={avatarPreview || (user.profile?.avatar ? (user.profile.avatar.startsWith('/uploads') ? backendUrl + user.profile.avatar : user.profile.avatar) : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name))}
+            src={avatarPreview || (user.profile?.avatar ? (user.profile.avatar.startsWith('http') ? user.profile.avatar : backendUrl + user.profile.avatar) : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name))}
             alt="avatar"
             className="w-24 h-24 rounded-full object-cover border mb-2"
           />

@@ -35,8 +35,8 @@ function QuestionList() {
               {q.files && q.files.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {q.files.map((file, i) => file.match(/\.(jpg|jpeg|png|gif)$/i)
-                    ? <ImageZoom key={i} src={file.startsWith('/uploads') ? backendUrl + file : file} alt="attachment" className="w-16 h-16 object-cover rounded border" />
-                    : <a key={i} href={file.startsWith('/uploads') ? backendUrl + file : file} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Download File</a>
+                    ? <ImageZoom key={i} src={file.startsWith('http') ? file : backendUrl + file} alt="attachment" className="w-16 h-16 object-cover rounded border" />
+                    : <a key={i} href={file.startsWith('http') ? file : backendUrl + file} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Download File</a>
                   )}
                 </div>
               )}

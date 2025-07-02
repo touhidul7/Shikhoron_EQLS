@@ -1,18 +1,28 @@
 const multer = require('multer');
-const path = require('path');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
+const cloudinaryConfig = require('../cloudinaryConfig');
 
-// Multer setup for file/image upload
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '../uploads'));
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const prefix = file.fieldname === 'image' ? 'book_' : 'resource_';
-    cb(null, prefix + Date.now() + ext);
+cloudinary.config(cloudinaryConfig);
+
+const resourceStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'resources',
+    resource_type: 'auto',
+    format: async (req, file) => undefined // keep original
   }
 });
-const upload = multer({ storage });
+const bookStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'books',
+    resource_type: 'image',
+    format: async (req, file) => undefined // keep original
+  }
+});
+const uploadResource = multer({ storage: resourceStorage });
+const uploadBook = multer({ storage: bookStorage });
 const express = require('express');
 const router = express.Router();
 const Resource = require('../models/Resource');
@@ -30,11 +40,11 @@ router.get('/resources', async (req, res) => {
 });
 
 // Resource create with file upload
-router.post('/resources', upload.single('file'), async (req, res) => {
+router.post('/resources', uploadResource.single('file'), async (req, res) => {
   try {
     const data = req.body;
     if (req.file) {
-      data.file = '/uploads/' + req.file.filename;
+      data.file = req.file.path; // Cloudinary URL
     }
     // Set moderator from session
     if (req.session && req.session.userId) {
@@ -56,6 +66,33 @@ router.put('/resources/:id', async (req, res) => {
 });
 
 router.delete('/resources/:id', async (req, res) => {
+  // Delete resource file from Cloudinary if it exists
+  const resource = await Resource.findById(req.params.id);
+  if (resource && resource.file) {
+    if (resource.file.startsWith('http') && resource.file.includes('cloudinary')) {
+      try {
+        const urlParts = resource.file.split('/');
+        const publicIdWithExt = urlParts[urlParts.length - 1];
+        const publicId = 'resources/' + publicIdWithExt.split('.')[0];
+        await cloudinary.uploader.destroy(publicId);
+        console.log('Resource file deleted from Cloudinary:', publicId);
+      } catch (e) {
+        console.warn('Failed to delete resource file from Cloudinary:', e.message);
+      }
+    }
+  }
+  // Also delete any files referenced in resource.link if it's a Cloudinary file
+  if (resource && resource.link && resource.link.startsWith('http') && resource.link.includes('cloudinary')) {
+    try {
+      const urlParts = resource.link.split('/');
+      const publicIdWithExt = urlParts[urlParts.length - 1];
+      const publicId = 'resources/' + publicIdWithExt.split('.')[0];
+      await cloudinary.uploader.destroy(publicId);
+      console.log('Resource link file deleted from Cloudinary:', publicId);
+    } catch (e) {
+      console.warn('Failed to delete resource link file from Cloudinary:', e.message);
+    }
+  }
   await Resource.findByIdAndDelete(req.params.id);
   res.json({ message: 'Resource deleted' });
 });
@@ -67,11 +104,11 @@ router.get('/books', async (req, res) => {
 });
 
 // Book create with image upload
-router.post('/books', upload.single('image'), async (req, res) => {
+router.post('/books', uploadBook.single('image'), async (req, res) => {
   try {
     const data = req.body;
     if (req.file) {
-      data.image = '/uploads/' + req.file.filename;
+      data.image = req.file.path; // Cloudinary URL
     }
     // Set moderator from session
     if (req.session && req.session.userId) {
@@ -93,6 +130,19 @@ router.put('/books/:id', async (req, res) => {
 });
 
 router.delete('/books/:id', async (req, res) => {
+  // Delete book image from Cloudinary if it exists
+  const book = await Book.findById(req.params.id);
+  if (book && book.image && book.image.startsWith('http') && book.image.includes('cloudinary')) {
+    try {
+      const urlParts = book.image.split('/');
+      const publicIdWithExt = urlParts[urlParts.length - 1];
+      const publicId = 'books/' + publicIdWithExt.split('.')[0];
+      await cloudinary.uploader.destroy(publicId);
+      console.log('Book image deleted from Cloudinary:', publicId);
+    } catch (e) {
+      console.warn('Failed to delete book image from Cloudinary:', e.message);
+    }
+  }
   await Book.findByIdAndDelete(req.params.id);
   res.json({ message: 'Book deleted' });
 });

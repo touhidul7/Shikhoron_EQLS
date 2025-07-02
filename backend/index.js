@@ -10,8 +10,9 @@ const User = require('./models/User');
 
 const app = express();
 
-// Middleware
-app.use(express.json());
+
+
+// CORS middleware
 app.use(cors({
   origin: [
     'http://localhost:3000',
@@ -26,7 +27,10 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Session setup
+// Parse JSON bodies before all routes (except file upload endpoints)
+app.use(express.json());
+
+// Session setup (must come before any routes that use req.session)
 app.use(session({
   secret: process.env.SESSION_SECRET || 'qna_secret',
   resave: false,
@@ -34,6 +38,9 @@ app.use(session({
   store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
   cookie: { maxAge: 1000 * 60 * 60 * 24 } // 1 day
 }));
+
+// Auth routes (file upload endpoints in this router will still work)
+app.use('/api/auth', require('./routes/auth'));
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
@@ -67,11 +74,9 @@ mongoose.connect(process.env.MONGO_URI, {
 })
   .catch(err => console.error('MongoDB connection error:', err));
 
+
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Auth routes
-app.use('/api/auth', require('./routes/auth'));
 // Admin routes
 app.use('/api/admin', require('./routes/admin'));
 // Class routes

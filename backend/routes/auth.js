@@ -2,8 +2,26 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+// Use existing cloudinary instance if already loaded
+let cloudinary;
+try {
+  cloudinary = require('cloudinary').v2;
+} catch (e) {
+  cloudinary = global.cloudinary;
+}
+const cloudinaryConfig = require('../cloudinaryConfig');
+cloudinary.config(cloudinaryConfig);
+const avatarStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'avatars',
+    resource_type: 'image',
+    format: async (req, file) => undefined // keep original
+  }
+});
+const upload = multer({ storage: avatarStorage });
+// No longer need path, fs, or uploadDir
 
 // Update profile info (PUT /auth/profile)
 router.put('/profile', async (req, res) => {
@@ -34,19 +52,7 @@ router.put('/profile', async (req, res) => {
   }
 });
 
-// Set up multer for profile image uploads
-const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    // Use user id if available, otherwise Date.now()
-    let ext = path.extname(file.originalname);
-    let userId = req.session && req.session.userId ? req.session.userId : Date.now();
-    cb(null, userId + ext);
-  }
-});
-const upload = multer({ storage });
+
 
 // Register
 router.post('/register', upload.single('avatar'), async (req, res) => {
@@ -62,12 +68,7 @@ router.post('/register', upload.single('avatar'), async (req, res) => {
     await user.save();
     let avatar = '';
     if (req.file) {
-      // Rename file to userId.ext
-      const ext = path.extname(req.file.originalname);
-      const newFilename = user._id + ext;
-      const newPath = path.join(uploadDir, newFilename);
-      fs.renameSync(req.file.path, newPath);
-      avatar = `/uploads/${newFilename}`;
+      avatar = req.file.path; // Cloudinary URL
       user.profile.avatar = avatar;
       await user.save();
     }
@@ -81,30 +82,44 @@ router.post('/register', upload.single('avatar'), async (req, res) => {
 
 // ...existing code...
 
-// Place this route AFTER all requires and variable declarations
-
 // Update profile avatar
 router.post('/update-avatar', upload.single('avatar'), async (req, res) => {
+  console.log('Received avatar upload request');
   try {
-    if (!req.session.userId) return res.status(401).json({ message: 'Not logged in' });
-    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-    const user = await User.findById(req.session.userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    // Remove old avatar if exists
-    if (user.profile && user.profile.avatar) {
-      const oldPath = path.join(uploadDir, path.basename(user.profile.avatar));
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    if (!req.session.userId) {
+      console.log('Not logged in');
+      return res.status(401).json({ message: 'Not logged in' });
     }
-    // Rename new file to userId.ext
-    const ext = path.extname(req.file.originalname);
-    const newFilename = user._id + ext;
-    const newPath = path.join(uploadDir, newFilename);
-    fs.renameSync(req.file.path, newPath);
-    const avatar = `/uploads/${newFilename}`;
-    user.profile.avatar = avatar;
+    if (!req.file) {
+      console.log('No file uploaded');
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    const user = await User.findById(req.session.userId);
+    if (!user) {
+      console.log('User not found');
+      return res.status(404).json({ message: 'User not found' });
+    }
+    // Delete old avatar from Cloudinary if it exists
+    if (user.profile && user.profile.avatar) {
+      try {
+        const urlParts = user.profile.avatar.split('/');
+        const publicIdWithExt = urlParts[urlParts.length - 1];
+        const publicId = 'avatars/' + publicIdWithExt.split('.')[0];
+        await cloudinary.uploader.destroy(publicId);
+        console.log('Old avatar deleted from Cloudinary:', publicId);
+      } catch (e) {
+        console.warn('Failed to delete old avatar from Cloudinary:', e.message);
+      }
+    }
+    // Update with new avatar
+    if (!user.profile) user.profile = {};
+    user.profile.avatar = req.file.path;
+    user.markModified('profile');
     await user.save();
-    res.json({ message: 'Avatar updated', avatar });
+    console.log('Avatar updated successfully:', user.profile.avatar);
+    res.json({ message: 'Avatar updated', avatar: user.profile.avatar });
   } catch (err) {
+    console.error('Avatar upload error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });

@@ -193,7 +193,7 @@ function ModeratorDashboard() {
                 // Determine file type for preview
                 let fileCell = null;
                 if (r.file) {
-                  const fileUrl = `${backendUrl}${r.file}`;
+                  const fileUrl = r.file.startsWith('http') ? r.file : backendUrl + r.file;
                   const ext = r.file.split('.').pop().toLowerCase();
                   if (["jpg","jpeg","png","gif","bmp","webp"].includes(ext)) {
                     fileCell = <img src={fileUrl} alt="resource" className="w-16 h-16 object-cover rounded" />;
@@ -249,7 +249,7 @@ function ModeratorDashboard() {
               {books.map(b => (
                 <tr key={b._id}>
                   <td className="px-4 py-2 border">
-                    {b.image && <img src={`${backendUrl}${b.image}`} alt="book" className="w-16 h-16 object-cover rounded" />}
+                    {b.image && <img src={b.image.startsWith('http') ? b.image : backendUrl + b.image} alt="book" className="w-16 h-16 object-cover rounded" />}
                     </td>
                   <td className="px-4 py-2 border">{b.title}</td>
                   <td className="px-4 py-2 border">{b.description}</td>
